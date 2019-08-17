@@ -12,7 +12,7 @@ export default class NavBar extends Component {
 
     return (
       <Menu inverted>
-        <Menu.Item header>DevOnboardingTask</Menu.Item>
+        <Menu.Item header>Dev Onboarding Task</Menu.Item>
         <Menu.Item
           as={Link}
           to="/"
@@ -41,6 +41,9 @@ export default class NavBar extends Component {
           active={activeItem === "sales"}
           onClick={this.handleItemClick}
         />
+        <Menu.Menu position="right">
+          <Menu.Item icon="code" name="Tim Young" />
+        </Menu.Menu>
       </Menu>
     );
   }

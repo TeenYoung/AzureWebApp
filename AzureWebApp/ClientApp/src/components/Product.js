@@ -1,5 +1,6 @@
 ﻿import React, { Component } from "react";
 import { Icon, Modal, Button, Table, Form } from "semantic-ui-react";
+import Joi from "joi-browser";
 import Pagination from "./common/Pagination";
 import Axios from "axios";
 
@@ -10,7 +11,35 @@ class Product extends Component {
     products: [],
     pageSize: 5,
     currentPage: 1,
-    newProduct: { name: "", price: "" }
+    newProduct: { name: "", price: "" },
+    errors: { name: null, price: null }
+  };
+
+  schema = {
+    name: Joi.string().required(),
+    price: Joi.number()
+      .positive()
+      .required()
+  };
+
+  validateForm = () => {
+    const options = { abortEarly: false };
+    const { error } = Joi.validate(this.state.newProduct, this.schema, options);
+
+    if (!error) return null;
+
+    const errors = {};
+    for (let i of error.details) errors[i.path[0]] = i.message;
+
+    return errors;
+  };
+
+  validateField = (name, value) => {
+    const prop = { [name]: value };
+    const propSchema = { [name]: this.schema[name] };
+    const { error } = Joi.validate(prop, propSchema);
+
+    return error ? error.details[0].message : null;
   };
 
   async componentDidMount() {
@@ -21,7 +50,8 @@ class Product extends Component {
 
   handleNewProduct = () => {
     const newProduct = { name: "", price: "" };
-    this.setState({ newProduct });
+    const errors = { name: null, price: null };
+    this.setState({ newProduct, errors });
   };
 
   handleCreate = async () => {
@@ -35,7 +65,8 @@ class Product extends Component {
 
   handleEdit = product => {
     const newProduct = { ...product };
-    this.setState({ newProduct });
+    const errors = { name: null, price: null };
+    this.setState({ newProduct, errors });
   };
 
   handleUpdate = async product => {
@@ -62,10 +93,14 @@ class Product extends Component {
     this.setState({ products });
   };
 
-  handleInputChange = ({ currentTarget: input }) => {
+  handleInputChange = (e, { name, value }) => {
     const newProduct = { ...this.state.newProduct };
-    newProduct[input.name] = input.value;
-    this.setState({ newProduct });
+    newProduct[name] = value;
+
+    const errors = { ...this.state.errors };
+    errors[name] = this.validateField(name, value);
+
+    this.setState({ newProduct, errors });
   };
 
   handlePageChange = pageNumber => {
@@ -81,6 +116,7 @@ class Product extends Component {
     const { length: productsCount } = products;
     const { pageSize, currentPage } = this.state;
     const { name, price } = this.state.newProduct;
+    const { name: nameError, price: priceError } = this.state.errors;
 
     if (productsCount === 0) return <h3>Opps, we don't have any product!</h3>;
 
@@ -122,6 +158,7 @@ class Product extends Component {
                   content={
                     <Form style={{ margin: 30 }}>
                       <Form.Input
+                        error={nameError}
                         required
                         label="NAME"
                         name="name"
@@ -130,6 +167,7 @@ class Product extends Component {
                       />
                       <Form.Input
                         required
+                        error={priceError}
                         label="PRICE"
                         name="price"
                         value={price}
@@ -141,6 +179,7 @@ class Product extends Component {
                     "Cancel",
                     <Button
                       key={"edit"}
+                      disabled={this.validateForm() ? true : false}
                       onClick={() => this.handleUpdate(product)}
                       positive
                     >
@@ -194,6 +233,7 @@ class Product extends Component {
 
   render() {
     const { name, price } = this.state.newProduct;
+    const { name: nameError, price: priceError } = this.state.errors;
 
     return (
       <React.Fragment>
@@ -210,6 +250,7 @@ class Product extends Component {
             <Form style={{ margin: 30 }}>
               <Form.Input
                 required
+                error={nameError}
                 label="NAME"
                 name="name"
                 value={name}
@@ -217,6 +258,7 @@ class Product extends Component {
               />
               <Form.Input
                 required
+                error={priceError}
                 label="PRICE"
                 name="price"
                 value={price}
@@ -226,7 +268,12 @@ class Product extends Component {
           }
           actions={[
             "Cancel",
-            <Button key={"create"} onClick={() => this.handleCreate()} positive>
+            <Button
+              key={"create"}
+              disabled={this.validateForm() ? true : false}
+              onClick={() => this.handleCreate()}
+              positive
+            >
               Create
             </Button>
           ]}

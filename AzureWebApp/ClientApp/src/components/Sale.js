@@ -1,5 +1,6 @@
 ﻿import React, { Component } from "react";
 import { Icon, Modal, Button, Table, Form } from "semantic-ui-react";
+import Joi from "joi-browser";
 import Pagination from "./common/Pagination";
 import Axios from "axios";
 
@@ -7,6 +8,8 @@ const apiSales = "api/Sales";
 const apiCustomers = "api/Customers";
 const apiProducts = "api/Products";
 const apiStores = "api/Stores";
+
+const now = new Date();
 
 class Sale extends Component {
   state = {
@@ -18,11 +21,51 @@ class Sale extends Component {
     pageSize: 5,
     currentPage: 1,
     newSale: {
-      customerId: 0,
-      productId: 0,
-      storeId: 0,
+      customerId: null,
+      productId: null,
+      storeId: null,
       dateSold: ""
+    },
+    errors: {
+      customerId: null,
+      productId: null,
+      storeId: null,
+      dateSold: null
     }
+  };
+
+  schema = {
+    customerId: Joi.number()
+      .integer()
+      .required(),
+    productId: Joi.number()
+      .integer()
+      .required(),
+    storeId: Joi.number()
+      .integer()
+      .required(),
+    dateSold: Joi.date()
+      .max(now)
+      .required()
+  };
+
+  validateForm = () => {
+    const options = { abortEarly: false };
+    const { error } = Joi.validate(this.state.newSale, this.schema, options);
+    if (!error) return null;
+
+    const errors = {};
+    for (let i of error.details) errors[i.path[0]] = i.message;
+
+    return errors;
+  };
+
+  validateField = (name, value) => {
+    const prop = { [name]: value };
+    const propSchema = { [name]: this.schema[name] };
+    const { error } = Joi.validate(prop, propSchema);
+
+    return error ? error.details[0].message : null;
   };
 
   async componentDidMount() {
@@ -49,12 +92,19 @@ class Sale extends Component {
 
   handleNewSale = () => {
     const newSale = {
-      customerId: 0,
-      productId: 0,
-      storeId: 0,
+      customerId: null,
+      productId: null,
+      storeId: null,
       dateSold: ""
     };
-    this.setState({ newSale });
+
+    const errors = {
+      customerId: null,
+      productId: null,
+      storeId: null,
+      dateSold: null
+    };
+    this.setState({ newSale, errors });
   };
 
   handleCreate = async () => {
@@ -68,13 +118,21 @@ class Sale extends Component {
     this.setState({ sales, currentPage, salesViewModel });
   };
 
-  handleEdit = sale => {
-    const newSale = this.state.sales.find(s => s.id === sale.id);
-    const { dateSold } = newSale;
+  handleEdit = ({ id }) => {
+    const { customerId, productId, storeId, dateSold } = this.state.sales.find(
+      s => s.id === id
+    );
     const dateString = dateSold.substring(0, 10);
-    newSale.dateSold = dateString;
+    const newSale = { customerId, productId, storeId, dateSold: dateString };
 
-    this.setState({ newSale });
+    const errors = {
+      customerId: null,
+      productId: null,
+      storeId: null,
+      dateSold: null
+    };
+
+    this.setState({ newSale, errors });
   };
 
   handleUpdate = async sale => {
@@ -94,15 +152,6 @@ class Sale extends Component {
     this.setState({ sales, salesViewModel });
   };
 
-  handleEdit = sale => {
-    const newSale = this.state.sales.find(s => s.id === sale.id);
-    const { dateSold } = newSale;
-    const dateString = dateSold.substring(0, 10);
-    newSale.dateSold = dateString;
-
-    this.setState({ newSale });
-  };
-
   handleDelete = async sale => {
     const { data: deletedSale } = await Axios.delete(apiSales + "/" + sale.id);
 
@@ -118,7 +167,11 @@ class Sale extends Component {
   handleInputChange = (e, { name, value }) => {
     const newSale = { ...this.state.newSale };
     newSale[name] = value;
-    this.setState({ newSale });
+
+    const errors = { ...this.state.errors };
+    errors[name] = this.validateField(name, value);
+
+    this.setState({ newSale, errors });
   };
 
   handlePageChange = pageNumber => {
@@ -134,6 +187,12 @@ class Sale extends Component {
     const { length: salesCount } = salesViewModel;
     const { pageSize, currentPage } = this.state;
     const { customerId, productId, storeId, dateSold } = this.state.newSale;
+    const {
+      customerId: customerIdError,
+      productId: productIdError,
+      storeId: storeIdError,
+      dateSold: dateSoldError
+    } = this.state.errors;
 
     if (salesCount === 0) return <h3>Opps, we don't have any sale!</h3>;
 
@@ -181,6 +240,7 @@ class Sale extends Component {
                     <Form style={{ margin: 30 }}>
                       <Form.Dropdown
                         required
+                        error={customerIdError}
                         label="Customer"
                         name="customerId"
                         value={customerId}
@@ -191,6 +251,7 @@ class Sale extends Component {
                       />
                       <Form.Dropdown
                         required
+                        error={productIdError}
                         label="Product"
                         name="productId"
                         value={productId}
@@ -201,6 +262,7 @@ class Sale extends Component {
                       />
                       <Form.Dropdown
                         required
+                        error={storeIdError}
                         label="Store"
                         name="storeId"
                         value={storeId}
@@ -211,6 +273,7 @@ class Sale extends Component {
                       />
                       <Form.Input
                         required
+                        error={dateSoldError}
                         type="Date"
                         label="Date Sold"
                         name="dateSold"
@@ -223,6 +286,7 @@ class Sale extends Component {
                     "Cancel",
                     <Button
                       key={"edit"}
+                      disabled={this.validateForm() ? true : false}
                       onClick={() => this.handleUpdate(sale)}
                       positive
                     >
@@ -276,6 +340,12 @@ class Sale extends Component {
 
   render() {
     const { customerId, productId, storeId, dateSold } = this.state.newSale;
+    const {
+      customerId: customerIdError,
+      productId: productIdError,
+      storeId: storeIdError,
+      dateSold: dateSoldError
+    } = this.state.errors;
 
     return (
       <React.Fragment>
@@ -292,6 +362,7 @@ class Sale extends Component {
             <Form style={{ margin: 30 }}>
               <Form.Dropdown
                 required
+                error={customerIdError}
                 label="Customer"
                 name="customerId"
                 value={customerId}
@@ -302,6 +373,7 @@ class Sale extends Component {
               />
               <Form.Dropdown
                 required
+                error={productIdError}
                 label="Product"
                 name="productId"
                 value={productId}
@@ -312,6 +384,7 @@ class Sale extends Component {
               />
               <Form.Dropdown
                 required
+                err={storeIdError}
                 label="Store"
                 name="storeId"
                 value={storeId}
@@ -322,6 +395,7 @@ class Sale extends Component {
               />
               <Form.Input
                 required
+                error={dateSoldError}
                 type="Date"
                 label="Date Sold"
                 name="dateSold"
@@ -332,7 +406,12 @@ class Sale extends Component {
           }
           actions={[
             "Cancel",
-            <Button key={"create"} onClick={() => this.handleCreate()} positive>
+            <Button
+              key={"create"}
+              disabled={this.validateForm() ? true : false}
+              onClick={() => this.handleCreate()}
+              positive
+            >
               Create
             </Button>
           ]}

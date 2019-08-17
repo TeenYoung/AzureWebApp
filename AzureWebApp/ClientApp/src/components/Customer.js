@@ -1,5 +1,6 @@
 ﻿import React, { Component } from "react";
-import { Icon, Modal, Button, Table, Form, Message } from "semantic-ui-react";
+import { Icon, Modal, Button, Table, Form } from "semantic-ui-react";
+import Joi from "joi-browser";
 import Pagination from "./common/Pagination";
 import Axios from "axios";
 
@@ -10,7 +11,37 @@ class Customer extends Component {
     customers: [],
     pageSize: 5,
     currentPage: 1,
-    newCustomer: { name: "", address: "" }
+    newCustomer: { name: "", address: "" },
+    errors: { name: null, address: null }
+  };
+
+  schema = {
+    name: Joi.string().required(),
+    address: Joi.string().required()
+  };
+
+  validateForm = () => {
+    const options = { abortEarly: false };
+    const { error } = Joi.validate(
+      this.state.newCustomer,
+      this.schema,
+      options
+    );
+
+    if (!error) return null;
+
+    const errors = {};
+    for (let i of error.details) errors[i.path[0]] = i.message;
+
+    return errors;
+  };
+
+  validateField = (name, value) => {
+    const prop = { [name]: value };
+    const propSchema = { [name]: this.schema[name] };
+    const { error } = Joi.validate(prop, propSchema);
+
+    return error ? error.details[0].message : null;
   };
 
   async componentDidMount() {
@@ -21,7 +52,8 @@ class Customer extends Component {
 
   handleNewCustomer = () => {
     const newCustomer = { name: "", address: "" };
-    this.setState({ newCustomer });
+    const errors = { name: null, address: null };
+    this.setState({ newCustomer, errors });
   };
 
   handleCreate = async () => {
@@ -33,9 +65,10 @@ class Customer extends Component {
     this.setState({ customers, currentPage });
   };
 
-  handleEdit = customer => {
-    const newCustomer = { ...customer };
-    this.setState({ newCustomer });
+  handleEdit = ({ name, address }) => {
+    const newCustomer = { name, address };
+    const errors = { name: null, address: null };
+    this.setState({ newCustomer, errors });
   };
 
   handleUpdate = async customer => {
@@ -65,7 +98,11 @@ class Customer extends Component {
   handleInputChange = (e, { name, value }) => {
     const newCustomer = { ...this.state.newCustomer };
     newCustomer[name] = value;
-    this.setState({ newCustomer });
+
+    const errors = { ...this.state.errors };
+    errors[name] = this.validateField(name, value);
+
+    this.setState({ newCustomer, errors });
   };
 
   handlePageChange = pageNumber => {
@@ -77,10 +114,10 @@ class Customer extends Component {
   };
 
   renderCustomersTable() {
-    const { customers } = this.state;
+    const { customers, pageSize, currentPage } = this.state;
     const { length: customersCount } = customers;
-    const { pageSize, currentPage } = this.state;
     const { name, address } = this.state.newCustomer;
+    const { name: nameError, address: addressError } = this.state.errors;
 
     if (customersCount === 0) return <h3>Opps, we don't have any customer!</h3>;
 
@@ -123,6 +160,7 @@ class Customer extends Component {
                     <Form style={{ margin: 30 }}>
                       <Form.Input
                         required
+                        error={nameError}
                         label="NAME"
                         name="name"
                         value={name}
@@ -130,6 +168,7 @@ class Customer extends Component {
                       />
                       <Form.Input
                         required
+                        error={addressError}
                         label="ADDRESS"
                         name="address"
                         value={address}
@@ -141,6 +180,7 @@ class Customer extends Component {
                     "Cancel",
                     <Button
                       key={"edit"}
+                      disabled={this.validateForm() ? true : false}
                       onClick={() => this.handleUpdate(customer)}
                       positive
                     >
@@ -194,6 +234,7 @@ class Customer extends Component {
 
   render() {
     const { name, address } = this.state.newCustomer;
+    const { name: nameError, address: addressError } = this.state.errors;
 
     return (
       <React.Fragment>
@@ -210,6 +251,7 @@ class Customer extends Component {
             <Form style={{ margin: 30 }}>
               <Form.Input
                 required
+                error={nameError}
                 label="NAME"
                 name="name"
                 value={name}
@@ -217,6 +259,7 @@ class Customer extends Component {
               />
               <Form.Input
                 required
+                error={addressError}
                 label="ADDRESS"
                 name="address"
                 value={address}
@@ -226,7 +269,12 @@ class Customer extends Component {
           }
           actions={[
             "Cancel",
-            <Button key={"create"} onClick={() => this.handleCreate()} positive>
+            <Button
+              key={"create"}
+              disabled={this.validateForm() ? true : false}
+              onClick={() => this.handleCreate()}
+              positive
+            >
               Create
             </Button>
           ]}

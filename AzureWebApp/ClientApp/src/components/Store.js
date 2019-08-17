@@ -1,5 +1,6 @@
 ﻿import React, { Component } from "react";
 import { Icon, Modal, Button, Table, Form } from "semantic-ui-react";
+import Joi from "joi-browser";
 import Pagination from "./common/Pagination";
 import Axios from "axios";
 
@@ -10,7 +11,33 @@ class Store extends Component {
     stores: [],
     pageSize: 5,
     currentPage: 1,
-    newStore: { name: "", address: "" }
+    newStore: { name: "", address: "" },
+    errors: { name: null, address: null }
+  };
+
+  schema = {
+    name: Joi.string().required(),
+    address: Joi.string().required()
+  };
+
+  validateForm = () => {
+    const options = { abortEarly: false };
+    const { error } = Joi.validate(this.state.newStore, this.schema, options);
+
+    if (!error) return null;
+
+    const errors = {};
+    for (let i of error.details) errors[i.path[0]] = i.message;
+
+    return errors;
+  };
+
+  validateField = (name, value) => {
+    const prop = { [name]: value };
+    const propSchema = { [name]: this.schema[name] };
+    const { error } = Joi.validate(prop, propSchema);
+
+    return error ? error.details[0].message : null;
   };
 
   async componentDidMount() {
@@ -21,7 +48,9 @@ class Store extends Component {
 
   handleNewStore = () => {
     const newStore = { name: "", address: "" };
-    this.setState({ newStore });
+    const errors = { name: null, address: null };
+
+    this.setState({ newStore, errors });
   };
 
   handleCreate = async () => {
@@ -33,9 +62,10 @@ class Store extends Component {
     this.setState({ stores, currentPage });
   };
 
-  handleEdit = store => {
-    const newStore = { ...store };
-    this.setState({ newStore });
+  handleEdit = ({ name, address }) => {
+    const newStore = { name, address };
+    const errors = { name: null, address: null };
+    this.setState({ newStore, errors });
   };
 
   handleUpdate = async store => {
@@ -60,10 +90,14 @@ class Store extends Component {
     this.setState({ stores });
   };
 
-  handleInputChange = ({ currentTarget: input }) => {
+  handleInputChange = (e, { name, value }) => {
     const newStore = { ...this.state.newStore };
-    newStore[input.name] = input.value;
-    this.setState({ newStore });
+    newStore[name] = value;
+
+    const errors = { ...this.state.errors };
+    errors[name] = this.validateField(name, value);
+
+    this.setState({ newStore, errors });
   };
 
   handlePageChange = pageNumber => {
@@ -79,6 +113,7 @@ class Store extends Component {
     const { length: storesCount } = stores;
     const { pageSize, currentPage } = this.state;
     const { name, address } = this.state.newStore;
+    const { name: nameError, address: addressError } = this.state.errors;
 
     if (storesCount === 0) return <h3>Opps, we don't have any store!</h3>;
 
@@ -121,6 +156,7 @@ class Store extends Component {
                     <Form style={{ margin: 30 }}>
                       <Form.Input
                         required
+                        error={nameError}
                         label="NAME"
                         name="name"
                         value={name}
@@ -128,6 +164,7 @@ class Store extends Component {
                       />
                       <Form.Input
                         required
+                        error={addressError}
                         label="ADDRESS"
                         name="address"
                         value={address}
@@ -139,6 +176,7 @@ class Store extends Component {
                     "Cancel",
                     <Button
                       key={"edit"}
+                      disabled={this.validateForm() ? true : false}
                       onClick={() => this.handleUpdate(store)}
                       positive
                     >
@@ -192,6 +230,7 @@ class Store extends Component {
 
   render() {
     const { name, address } = this.state.newStore;
+    const { name: nameError, address: addressError } = this.state.errors;
 
     return (
       <React.Fragment>
@@ -208,6 +247,7 @@ class Store extends Component {
             <Form style={{ margin: 30 }}>
               <Form.Input
                 required
+                error={nameError}
                 label="NAME"
                 name="name"
                 value={name}
@@ -215,6 +255,7 @@ class Store extends Component {
               />
               <Form.Input
                 required
+                error={addressError}
                 label="ADDRESS"
                 name="address"
                 value={address}
@@ -224,7 +265,12 @@ class Store extends Component {
           }
           actions={[
             "Cancel",
-            <Button key={"create"} onClick={() => this.handleCreate()} positive>
+            <Button
+              key={"create"}
+              disabled={this.validateForm() ? true : false}
+              onClick={() => this.handleCreate()}
+              positive
+            >
               Create
             </Button>
           ]}
